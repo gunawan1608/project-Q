@@ -21,17 +21,15 @@ class SurahListScreen extends ConsumerWidget {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-                    child: _Header(
-                      total: surah.length,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                    child: _Header(total: surah.length),
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
                   sliver: SliverList.separated(
                     itemCount: surah.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final s = surah[index];
                       return _SurahCard(
@@ -44,7 +42,8 @@ class SurahListScreen extends ConsumerWidget {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => SurahDetailScreen(surahNumber: s.number),
+                              builder: (_) =>
+                                  SurahDetailScreen(surahNumber: s.number),
                             ),
                           );
                         },
@@ -62,7 +61,8 @@ class SurahListScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 24),
-                Text('Failed to load surah list', style: Theme.of(context).textTheme.titleLarge),
+                Text('Failed to load surah list',
+                    style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 8),
                 Text(e.toString()),
                 const SizedBox(height: 12),
@@ -81,7 +81,6 @@ class SurahListScreen extends ConsumerWidget {
 
 class _Header extends StatelessWidget {
   const _Header({required this.total});
-
   final int total;
 
   @override
@@ -89,54 +88,121 @@ class _Header extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.green800,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(Icons.menu_book_rounded, color: Colors.white),
+        // Hero banner with bismillah
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppTheme.green800,
+                AppTheme.green900,
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.green800.withOpacity(0.35),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
+              Text(
+                'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'Amiri',
+                  fontSize: 22,
+                  height: 2.0,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'In the name of Allah, the Most Gracious, the Most Merciful',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  color: Colors.white.withOpacity(0.75),
+                  fontStyle: FontStyle.italic,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Divider(color: Colors.white.withOpacity(0.15), height: 1),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text("Qur'an", style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$total surahs • English translation',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.green900.withOpacity(0.65),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.menu_book_rounded,
+                            size: 14,
+                            color: Colors.white.withOpacity(0.9)),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$total Surahs',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      'English Translation',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.82),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.green900.withOpacity(0.06)),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.auto_awesome, size: 18, color: AppTheme.green800.withOpacity(0.9)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Pick a surah to start reading.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              )
             ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'All Surahs',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontSize: 13,
+                  color: AppTheme.green900.withOpacity(0.5),
+                  letterSpacing: 0.8,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ),
       ],
@@ -165,17 +231,20 @@ class _SurahCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMakki = revelationType.toLowerCase() == 'meccan';
+
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
+              // Number badge
               Container(
-                width: 44,
-                height: 44,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
@@ -185,7 +254,7 @@ class _SurahCard extends StatelessWidget {
                       AppTheme.green600,
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
                   child: Text(
@@ -193,40 +262,93 @@ class _SurahCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
+                          fontSize: 14,
                         ),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
+              // English name + meta
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       englishName,
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style:
+                          Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontSize: 15,
+                              ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$translation • $revelationType • $ayahCount ayahs',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.green900.withOpacity(0.62),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Text(
+                          translation,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppTheme.green900.withOpacity(0.55),
+                                    fontSize: 12,
+                                  ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 3,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: AppTheme.green900.withOpacity(0.3),
+                            shape: BoxShape.circle,
                           ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: isMakki
+                                ? AppTheme.green800.withOpacity(0.10)
+                                : Colors.amber.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            revelationType,
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: isMakki
+                                  ? AppTheme.green800
+                                  : Colors.amber.shade800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$ayahCount ayahs',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppTheme.green900.withOpacity(0.45),
+                                    fontSize: 11,
+                                  ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 10),
+              // Arabic name
               Text(
                 arabicName,
                 style: const TextStyle(
                   fontFamily: 'Amiri',
-                  fontSize: 18,
-                  height: 1.2,
+                  fontSize: 20,
+                  height: 1.4,
+                  color: AppTheme.green800,
                 ),
               ),
             ],
