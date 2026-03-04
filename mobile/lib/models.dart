@@ -83,21 +83,30 @@ class SurahDetail {
 class SurahPageResponse {
   final SurahDetail arabic;
   final SurahDetail translation;
+  final SurahDetail? transliteration; // nullable — backend may not always return it
   final String edition;
 
   const SurahPageResponse({
     required this.arabic,
     required this.translation,
+    this.transliteration,
     required this.edition,
   });
 
   factory SurahPageResponse.fromJson(Map<String, dynamic> json) {
     final arabicData = (json['arabic'] as Map<String, dynamic>?) ?? const {};
     final translationData = (json['translation'] as Map<String, dynamic>?) ?? const {};
+    final transliterationData = json['transliteration'] as Map<String, dynamic>?;
 
     return SurahPageResponse(
-      arabic: SurahDetail.fromJson((arabicData['data'] as Map<String, dynamic>?) ?? const {}),
-      translation: SurahDetail.fromJson((translationData['data'] as Map<String, dynamic>?) ?? const {}),
+      arabic: SurahDetail.fromJson(
+          (arabicData['data'] as Map<String, dynamic>?) ?? const {}),
+      translation: SurahDetail.fromJson(
+          (translationData['data'] as Map<String, dynamic>?) ?? const {}),
+      transliteration: transliterationData != null
+          ? SurahDetail.fromJson(
+              (transliterationData['data'] as Map<String, dynamic>?) ?? const {})
+          : null,
       edition: (json['edition'] as String?) ?? 'en.asad',
     );
   }

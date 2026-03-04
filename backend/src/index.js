@@ -35,12 +35,14 @@ app.get('/surah/:id', async (req, res) => {
   const edition = req.query.edition || 'en.asad';
 
   try {
-    const [arabic, translation] = await Promise.all([
+    // Fetch arabic, translation, and transliteration in parallel
+    const [arabic, translation, transliteration] = await Promise.all([
       fetchJson(`${QURAN_API_BASE}/surah/${encodeURIComponent(id)}`),
-      fetchJson(`${QURAN_API_BASE}/surah/${encodeURIComponent(id)}/${encodeURIComponent(edition)}`)
+      fetchJson(`${QURAN_API_BASE}/surah/${encodeURIComponent(id)}/${encodeURIComponent(edition)}`),
+      fetchJson(`${QURAN_API_BASE}/surah/${encodeURIComponent(id)}/en.transliteration`),
     ]);
 
-    res.json({ arabic, translation, edition });
+    res.json({ arabic, translation, transliteration, edition });
   } catch (err) {
     res.status(502).json({ error: 'Failed to fetch surah detail', detail: String(err?.message || err) });
   }
