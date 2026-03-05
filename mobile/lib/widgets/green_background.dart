@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../theme.dart';
 
 class GreenBackground extends StatelessWidget {
@@ -7,52 +6,39 @@ class GreenBackground extends StatelessWidget {
 
   final Widget child;
 
+  static final _PatternPainter _painter = _PatternPainter();
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        const _Bg(),
+        RepaintBoundary(
+          child: DecoratedBox(
+            decoration: const BoxDecoration(gradient: AppTheme.bgGradient),
+            child: CustomPaint(
+              painter: _painter,
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
         SafeArea(child: child),
       ],
     );
   }
 }
 
-class _Bg extends StatelessWidget {
-  const _Bg();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFE8FDF0),
-            AppTheme.bg,
-            Color(0xFFF7FFFA),
-          ],
-        ),
-      ),
-      child: CustomPaint(
-        painter: _PatternPainter(),
-        child: const SizedBox.expand(),
-      ),
-    );
-  }
-}
-
 class _PatternPainter extends CustomPainter {
+  final Paint _dotPaint = Paint()
+    ..color = const Color(0x09064E3B) 
+    ..isAntiAlias = false; 
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = AppTheme.green900.withOpacity(0.035);
-
-    const double step = 48;
+    const double step = 48.0;
+    const double radius = 10.0;
     for (double y = -step; y < size.height + step; y += step) {
       for (double x = -step; x < size.width + step; x += step) {
-        final center = Offset(x, y);
-        canvas.drawCircle(center, 10, paint);
+        canvas.drawCircle(Offset(x, y), radius, _dotPaint);
       }
     }
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/green_background.dart';
@@ -17,72 +18,13 @@ class SurahDetailScreen extends ConsumerWidget {
     return Scaffold(
       body: GreenBackground(
         child: detailAsync.when(
-          data: (page) {
-            final arabic = page.arabic;
-            final translation = page.translation;
-            final transliteration = page.transliteration;
-            final count = arabic.ayahs.length;
-
-            return CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: _DetailHeader(
-                      surahNumber: surahNumber,
-                      arabicName: arabic.name,
-                      englishName: arabic.englishName,
-                      englishNameTranslation: arabic.englishNameTranslation,
-                      revelationType: arabic.revelationType,
-                      ayahCount: arabic.numberOfAyahs,
-                    ),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
-                  sliver: SliverList.separated(
-                    itemCount: count,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final a = arabic.ayahs[index];
-                      final t = index < translation.ayahs.length
-                          ? translation.ayahs[index]
-                          : null;
-                      final tl = (transliteration != null &&
-                              index < transliteration.ayahs.length)
-                          ? transliteration.ayahs[index]
-                          : null;
-                      return _AyahCard(
-                        numberInSurah: a.numberInSurah,
-                        arabic: a.text,
-                        transliteration: tl?.text,
-                        translation: t?.text,
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
+          // Pisahkan body ke widget sendiri → hanya body yang rebuild saat data
+          data: (page) => _DetailBody(surahNumber: surahNumber, page: page),
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 24),
-                Text('Failed to load surah detail',
-                    style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 8),
-                Text(e.toString()),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: () =>
-                      ref.invalidate(surahDetailProvider(surahNumber)),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
+          error: (e, _) => _ErrorView(
+            surahNumber: surahNumber,
+            detail: e.toString(),
+            onRetry: () => ref.invalidate(surahDetailProvider(surahNumber)),
           ),
         ),
       ),
@@ -90,14 +32,54 @@ class SurahDetailScreen extends ConsumerWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Header
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Body ──────────────────────────────────────────────────────────────────────
+
+class _DetailBody extends StatelessWidget {
+  const _DetailBody({required this.surahNumber, required this.page});
+
+  final int surahNumber;
+  final SurahPageResponse page;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: _DetailHeader(
+              surahNumber: surahNumber,
+              name: page.name,
+              englishName: page.englishName,
+              englishNameTranslation: page.englishNameTranslation,
+              revelationType: page.revelationType,
+              ayahCount: page.numberOfAyahs,
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
+          sliver: SliverList.separated(
+            itemCount: page.rows.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              return RepaintBoundary(
+                child: _AyahCard(row: page.rows[index]),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
 
 class _DetailHeader extends StatelessWidget {
   const _DetailHeader({
     required this.surahNumber,
-    required this.arabicName,
+    required this.name,
     required this.englishName,
     required this.englishNameTranslation,
     required this.revelationType,
@@ -105,7 +87,7 @@ class _DetailHeader extends StatelessWidget {
   });
 
   final int surahNumber;
-  final String arabicName;
+  final String name;
   final String englishName;
   final String englishNameTranslation;
   final String revelationType;
@@ -118,21 +100,21 @@ class _DetailHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Nav bar ──────────────────────────────────────────────
+        // ── Nav bar ────────────────────────────────────────────────────
         Row(
           children: [
             IconButton(
               onPressed: () => Navigator.of(context).maybePop(),
               icon: const Icon(Icons.arrow_back_rounded),
               style: IconButton.styleFrom(
-                backgroundColor: Colors.white.withOpacity(0.9),
+                backgroundColor: AppTheme.white90,
                 foregroundColor: AppTheme.green900,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
+                ),
               ),
             ),
             const SizedBox(width: 10),
-            // FIX: use Flexible so long names don't overflow
             Flexible(
               child: Text(
                 englishName,
@@ -142,12 +124,12 @@ class _DetailHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
+            // Badge nomor — const decoration
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: const BoxDecoration(
+                color: AppTheme.white90,
+                borderRadius: BorderRadius.all(Radius.circular(12)),
               ),
               child: Text(
                 '#$surahNumber',
@@ -161,107 +143,87 @@ class _DetailHeader extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
-        // ── Hero card ─────────────────────────────────────────────
+        // ── Hero card ──────────────────────────────────────────────────
         Container(
           width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppTheme.green800, AppTheme.green900],
-            ),
-            borderRadius: BorderRadius.circular(20),
+          decoration: const BoxDecoration(
+            gradient: AppTheme.heroGradient,
+            borderRadius: BorderRadius.all(Radius.circular(20)),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.green800.withOpacity(0.3),
+                color: AppTheme.green800op30,
                 blurRadius: 16,
-                offset: const Offset(0, 6),
+                offset: Offset(0, 6),
               ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Text(
-                  arabicName,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontFamily: 'Amiri',
-                    fontSize: 36,
-                    height: 1.6,
-                    color: Colors.white,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Text(name, textAlign: TextAlign.center, style: AppTheme.arabicHero),
+              const SizedBox(height: 4),
+              Text(
+                englishNameTranslation,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  fontStyle: FontStyle.italic,
+                  color: AppTheme.white75,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Divider(color: AppTheme.white15, height: 1),
+              const SizedBox(height: 14),
+              // Wrap: pills tidak overflow di layar sempit
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _MetaPill(
+                    icon: Icons.place_outlined,
+                    label: revelationType,
+                    // warna berbeda: Meccan = teal, Medinan = amber
+                    color: isMakki
+                        ? const Color(0xFFB2F5EA) // tealAccent.shade100
+                        : const Color(0xFFFEF3C7), // amber.shade100
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  englishNameTranslation,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.white.withOpacity(0.75),
-                    height: 1.4,
+                  _MetaPill(
+                    icon: Icons.format_list_numbered_rounded,
+                    label: '$ayahCount Ayahs',
+                    color: AppTheme.white85,
                   ),
-                ),
-                const SizedBox(height: 14),
-                Divider(color: Colors.white.withOpacity(0.15), height: 1),
-                const SizedBox(height: 14),
-                // FIX: Wrap replaces Row so pills never overflow
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    _MetaPill(
-                      icon: Icons.place_outlined,
-                      label: revelationType,
-                      color: isMakki
-                          ? Colors.tealAccent.shade100
-                          : Colors.amber.shade100,
-                    ),
-                    _MetaPill(
-                      icon: Icons.format_list_numbered_rounded,
-                      label: '$ayahCount Ayahs',
-                      color: Colors.white.withOpacity(0.85),
-                    ),
-                    _MetaPill(
-                      icon: Icons.translate_rounded,
-                      label: 'en.asad',
-                      color: Colors.white.withOpacity(0.85),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                  const _MetaPill(
+                    icon: Icons.translate_rounded,
+                    label: 'en.asad',
+                    color: AppTheme.white85,
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 14),
 
-        // ── Bismillah (skip for At-Tawbah #9) ─────────────────────
+        // ── Bismillah (kecuali Surah #9 At-Tawbah) ────────────────────
         if (surahNumber != 9)
           Container(
             width: double.infinity,
-            padding:
-                const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             margin: const EdgeInsets.only(bottom: 4),
-            decoration: BoxDecoration(
-              color: AppTheme.green800.withOpacity(0.07),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: AppTheme.green800.withOpacity(0.12)),
+            decoration: const BoxDecoration(
+              color: AppTheme.green800op07,
+              borderRadius: BorderRadius.all(Radius.circular(16)),
+              border: Border.fromBorderSide(
+                BorderSide(color: AppTheme.green800op12),
+              ),
             ),
             child: const Text(
               'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontFamily: 'Amiri',
-                fontSize: 24,
-                height: 2.0,
-                color: AppTheme.green800,
-                letterSpacing: 0.5,
-              ),
+              style: AppTheme.arabicBismillah,
             ),
           ),
       ],
@@ -269,9 +231,7 @@ class _DetailHeader extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Meta pill
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Meta pill ─────────────────────────────────────────────────────────────────
 
 class _MetaPill extends StatelessWidget {
   const _MetaPill({
@@ -288,66 +248,44 @@ class _MetaPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(99),
+      decoration: const BoxDecoration(
+        color: AppTheme.white12,
+        borderRadius: BorderRadius.all(Radius.circular(99)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 12, color: color),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
+          Text(label, style: AppTheme.pillLabel.copyWith(color: color)),
         ],
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Ayah card  ─  Arabic → Latin → Terjemahan
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ── Ayah card ─────────────────────────────────────────────────────────────────
 class _AyahCard extends StatelessWidget {
-  const _AyahCard({
-    required this.numberInSurah,
-    required this.arabic,
-    this.transliteration,
-    this.translation,
-  });
+  const _AyahCard({required this.row});
 
-  final int numberInSurah;
-  final String arabic;
-  final String? transliteration;
-  final String? translation;
+  final AyahRow row;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
       color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: AppTheme.green900.withOpacity(0.07)),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(18)),
+        side: BorderSide(color: AppTheme.green900op07),
       ),
-      // FIX: use intrinsic Column instead of fixed-height containers
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _AyahNumberRow(number: numberInSurah),
-          _ArabicBlock(text: arabic),
-          if (transliteration != null && transliteration!.isNotEmpty)
-            _LatinBlock(text: transliteration!),
-          if (translation != null && translation!.isNotEmpty)
-            _TranslationBlock(text: translation!),
+          _AyahNumberRow(number: row.numberInSurah),
+          _ArabicBlock(text: row.arabic),
+          if (row.latin.isNotEmpty) _LatinBlock(text: row.latin),
+          if (row.translation.isNotEmpty) _TranslationBlock(text: row.translation),
           const SizedBox(height: 6),
         ],
       ),
@@ -370,29 +308,21 @@ class _AyahNumberRow extends StatelessWidget {
           Container(
             width: 32,
             height: 32,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppTheme.green800,
-              borderRadius: BorderRadius.circular(9),
+              borderRadius: BorderRadius.all(Radius.circular(9)),
             ),
             alignment: Alignment.center,
-            child: Text(
-              '$number',
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
+            child: Text('$number', style: AppTheme.ayahBadgeNumber),
           ),
           const Spacer(),
           Text(
             'Ayah $number',
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Poppins',
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: AppTheme.green900.withOpacity(0.38),
+              color: AppTheme.green900op38,
               letterSpacing: 0.3,
             ),
           ),
@@ -408,77 +338,58 @@ class _ArabicBlock extends StatelessWidget {
   const _ArabicBlock({required this.text});
   final String text;
 
+  static const _decoration = BoxDecoration(
+    color: AppTheme.green800op045,
+    border: Border.symmetric(
+      horizontal: BorderSide(color: AppTheme.green900op07),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      // FIX: no fixed height — let the text decide its own height
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-      decoration: BoxDecoration(
-        color: AppTheme.green800.withOpacity(0.045),
-        border: Border.symmetric(
-          horizontal:
-              BorderSide(color: AppTheme.green900.withOpacity(0.07)),
-        ),
-      ),
-      child: Text(
-        text,
-        textAlign: TextAlign.right,
-        // FIX: explicit RTL direction so the widget never tries to clip
-        textDirection: TextDirection.rtl,
-        softWrap: true,
-        style: const TextStyle(
-          fontFamily: 'Amiri',
-          // Slightly reduced from 28 → 26 to give more wrapping room on
-          // narrow phones while still feeling generous.
-          fontSize: 26,
-          height: 2.3,
-          color: AppTheme.green900,
-          letterSpacing: 0.3,
+    return DecoratedBox(
+      decoration: _decoration,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        child: Text(
+          text,
+          textAlign: TextAlign.right,
+          textDirection: TextDirection.rtl,
+          softWrap: true,
+          style: AppTheme.arabicAyah,
         ),
       ),
     );
   }
 }
 
-// ── Latin / transliteration block ────────────────────────────────────────────
+// ── Latin block ───────────────────────────────────────────────────────────────
 
 class _LatinBlock extends StatelessWidget {
   const _LatinBlock({required this.text});
   final String text;
 
+  static const _decoration = BoxDecoration(
+    color: Color(0xFFF0FAF4),
+    border: Border(
+      bottom: BorderSide(color: AppTheme.green900op06),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0FAF4),
-        border: Border(
-          bottom: BorderSide(color: AppTheme.green900.withOpacity(0.06)),
+    return DecoratedBox(
+      decoration: _decoration,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionLabel(label: 'Latin', color: AppTheme.green600op65),
+            const SizedBox(height: 6),
+            Text(text, softWrap: true, style: AppTheme.latinAyah),
+          ],
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionLabel(
-            label: 'Latin',
-            color: AppTheme.green600.withOpacity(0.65),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            text,
-            softWrap: true,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 13,
-              height: 1.9,
-              fontStyle: FontStyle.italic,
-              color: AppTheme.green900.withOpacity(0.68),
-              letterSpacing: 0.1,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -497,30 +408,16 @@ class _TranslationBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionLabel(
-            label: 'Terjemahan',
-            color: AppTheme.green600,
-          ),
+          const _SectionLabel(label: 'Terjemahan', color: AppTheme.green600),
           const SizedBox(height: 6),
-          Text(
-            text,
-            softWrap: true,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 14,
-              height: 1.8,
-              color: AppTheme.green900.withOpacity(0.85),
-              letterSpacing: 0.1,
-            ),
-          ),
+          Text(text, softWrap: true, style: AppTheme.translationAyah),
         ],
       ),
     );
   }
 }
 
-// ── Shared label widget ───────────────────────────────────────────────────────
-
+// ── Section label ─────────────────────────────────────────────────────────────
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel({required this.label, required this.color});
   final String label;
@@ -531,26 +428,51 @@ class _SectionLabel extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        // Accent bar
         Container(
           width: 3,
           height: 13,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(99),
+            borderRadius: const BorderRadius.all(Radius.circular(99)),
           ),
         ),
         const SizedBox(width: 7),
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: color,
-            letterSpacing: 0.6,
-          ),
-        ),
+        Text(label, style: AppTheme.sectionLabel.copyWith(color: color)),
       ],
+    );
+  }
+}
+
+// ── Error view ────────────────────────────────────────────────────────────────
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({
+    required this.surahNumber,
+    required this.detail,
+    required this.onRetry,
+  });
+
+  final int surahNumber;
+  final String detail;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 24),
+          Text('Failed to load surah #$surahNumber',
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(detail),
+          const SizedBox(height: 12),
+          ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
     );
   }
 }

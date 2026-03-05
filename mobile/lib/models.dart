@@ -15,99 +15,107 @@ class SurahSummary {
     required this.revelationType,
   });
 
-  factory SurahSummary.fromJson(Map<String, dynamic> json) {
-    return SurahSummary(
-      number: (json['number'] as num).toInt(),
-      name: (json['name'] as String?) ?? '',
-      englishName: (json['englishName'] as String?) ?? '',
-      englishNameTranslation: (json['englishNameTranslation'] as String?) ?? '',
-      numberOfAyahs: (json['numberOfAyahs'] as num?)?.toInt() ?? 0,
-      revelationType: (json['revelationType'] as String?) ?? '',
-    );
-  }
+  static SurahSummary fromJson(Map<String, dynamic> json) => SurahSummary(
+        number: (json['number'] as num).toInt(),
+        name: (json['name'] as String?) ?? '',
+        englishName: (json['englishName'] as String?) ?? '',
+        englishNameTranslation:
+            (json['englishNameTranslation'] as String?) ?? '',
+        numberOfAyahs: (json['numberOfAyahs'] as num?)?.toInt() ?? 0,
+        revelationType: (json['revelationType'] as String?) ?? '',
+      );
 }
 
-class Ayah {
+class AyahRow {
+  final int numberInSurah;
+  final String arabic;
+  final String latin;       
+  final String translation; 
+
+  const AyahRow({
+    required this.numberInSurah,
+    required this.arabic,
+    required this.latin,
+    required this.translation,
+  });
+}
+
+class _RawAyah {
   final int numberInSurah;
   final String text;
+  const _RawAyah(this.numberInSurah, this.text);
 
-  const Ayah({
-    required this.numberInSurah,
-    required this.text,
-  });
-
-  factory Ayah.fromJson(Map<String, dynamic> json) {
-    return Ayah(
-      numberInSurah: (json['numberInSurah'] as num?)?.toInt() ?? 0,
-      text: (json['text'] as String?) ?? '',
-    );
-  }
+  factory _RawAyah.fromJson(Map<String, dynamic> j) => _RawAyah(
+        (j['numberInSurah'] as num?)?.toInt() ?? 0,
+        (j['text'] as String?) ?? '',
+      );
 }
 
-class SurahDetail {
+List<_RawAyah> _parseAyahs(Map<String, dynamic>? data) {
+  if (data == null) return const [];
+  final list = (data['ayahs'] as List?) ?? const [];
+  return list
+      .whereType<Map<String, dynamic>>()
+      .map(_RawAyah.fromJson)
+      .toList(growable: false);
+}
+
+Map<String, dynamic> _dataOf(Map<String, dynamic>? wrapper) =>
+    (wrapper?['data'] as Map<String, dynamic>?) ?? const {};
+
+class SurahPageResponse {
   final int number;
   final String name;
   final String englishName;
   final String englishNameTranslation;
   final String revelationType;
   final int numberOfAyahs;
-  final List<Ayah> ayahs;
+  final String edition;
 
-  const SurahDetail({
+  final List<AyahRow> rows;
+
+  const SurahPageResponse({
     required this.number,
     required this.name,
     required this.englishName,
     required this.englishNameTranslation,
     required this.revelationType,
     required this.numberOfAyahs,
-    required this.ayahs,
-  });
-
-  factory SurahDetail.fromJson(Map<String, dynamic> json) {
-    final ayahsJson = (json['ayahs'] as List?) ?? const [];
-    return SurahDetail(
-      number: (json['number'] as num).toInt(),
-      name: (json['name'] as String?) ?? '',
-      englishName: (json['englishName'] as String?) ?? '',
-      englishNameTranslation: (json['englishNameTranslation'] as String?) ?? '',
-      revelationType: (json['revelationType'] as String?) ?? '',
-      numberOfAyahs: (json['numberOfAyahs'] as num?)?.toInt() ?? 0,
-      ayahs: ayahsJson
-          .whereType<Map<String, dynamic>>()
-          .map(Ayah.fromJson)
-          .toList(growable: false),
-    );
-  }
-}
-
-class SurahPageResponse {
-  final SurahDetail arabic;
-  final SurahDetail translation;
-  final SurahDetail? transliteration; // nullable — backend may not always return it
-  final String edition;
-
-  const SurahPageResponse({
-    required this.arabic,
-    required this.translation,
-    this.transliteration,
     required this.edition,
+    required this.rows,
   });
 
-  factory SurahPageResponse.fromJson(Map<String, dynamic> json) {
-    final arabicData = (json['arabic'] as Map<String, dynamic>?) ?? const {};
-    final translationData = (json['translation'] as Map<String, dynamic>?) ?? const {};
-    final transliterationData = json['transliteration'] as Map<String, dynamic>?;
+  static SurahPageResponse fromJson(Map<String, dynamic> json) {
+    final arabicData   = _dataOf(json['arabic']          as Map<String, dynamic>?);
+    final transData    = _dataOf(json['translation']      as Map<String, dynamic>?);
+    final tlitData     = _dataOf(json['transliteration']  as Map<String, dynamic>?);
+
+    final arabicAyahs  = _parseAyahs(arabicData);
+    final transAyahs   = _parseAyahs(transData);
+    final tlitAyahs    = _parseAyahs(tlitData);
+
+    final count    = arabicAyahs.length;
+    final transLen = transAyahs.length;
+    final tlitLen  = tlitAyahs.length;
+
+    final rows = List<AyahRow>.generate(count, (i) {
+      return AyahRow(
+        numberInSurah: arabicAyahs[i].numberInSurah,
+        arabic:        arabicAyahs[i].text,
+        latin:         i < tlitLen  ? tlitAyahs[i].text  : '',
+        translation:   i < transLen ? transAyahs[i].text : '',
+      );
+    }, growable: false);
 
     return SurahPageResponse(
-      arabic: SurahDetail.fromJson(
-          (arabicData['data'] as Map<String, dynamic>?) ?? const {}),
-      translation: SurahDetail.fromJson(
-          (translationData['data'] as Map<String, dynamic>?) ?? const {}),
-      transliteration: transliterationData != null
-          ? SurahDetail.fromJson(
-              (transliterationData['data'] as Map<String, dynamic>?) ?? const {})
-          : null,
-      edition: (json['edition'] as String?) ?? 'en.asad',
+      number:                  (arabicData['number'] as num?)?.toInt() ?? 0,
+      name:                    (arabicData['name'] as String?) ?? '',
+      englishName:             (arabicData['englishName'] as String?) ?? '',
+      englishNameTranslation:  (arabicData['englishNameTranslation'] as String?) ?? '',
+      revelationType:          (arabicData['revelationType'] as String?) ?? '',
+      numberOfAyahs:           (arabicData['numberOfAyahs'] as num?)?.toInt() ?? count,
+      edition:                 (json['edition'] as String?) ?? 'en.asad',
+      rows:                    rows,
     );
   }
 }
