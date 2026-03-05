@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../language.dart';
 import '../models.dart';
 import '../providers.dart';
 import '../theme.dart';
@@ -14,16 +15,17 @@ class SurahDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detailAsync = ref.watch(surahDetailProvider(surahNumber));
+    final lang = ref.watch(languageProvider);
 
     return Scaffold(
       body: GreenBackground(
         child: detailAsync.when(
-          // Pisahkan body ke widget sendiri → hanya body yang rebuild saat data
-          data: (page) => _DetailBody(surahNumber: surahNumber, page: page),
+          data: (page) => _DetailBody(surahNumber: surahNumber, page: page, lang: lang),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => _ErrorView(
-            surahNumber: surahNumber,
+            label: '${lang.strings.failedLoadDetail} #$surahNumber',
             detail: e.toString(),
+            retryLabel: lang.strings.retry,
             onRetry: () => ref.invalidate(surahDetailProvider(surahNumber)),
           ),
         ),
@@ -32,29 +34,22 @@ class SurahDetailScreen extends ConsumerWidget {
   }
 }
 
-// ── Body ──────────────────────────────────────────────────────────────────────
-
 class _DetailBody extends StatelessWidget {
-  const _DetailBody({required this.surahNumber, required this.page});
+  const _DetailBody({required this.surahNumber, required this.page, required this.lang});
 
   final int surahNumber;
   final SurahPageResponse page;
+  final AppLanguage lang;
 
   @override
   Widget build(BuildContext context) {
+    final s = lang.strings;
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: _DetailHeader(
-              surahNumber: surahNumber,
-              name: page.name,
-              englishName: page.englishName,
-              englishNameTranslation: page.englishNameTranslation,
-              revelationType: page.revelationType,
-              ayahCount: page.numberOfAyahs,
-            ),
+            child: _DetailHeader(surahNumber: surahNumber, page: page, lang: lang),
           ),
         ),
         SliverPadding(
@@ -64,7 +59,12 @@ class _DetailBody extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               return RepaintBoundary(
-                child: _AyahCard(row: page.rows[index]),
+                child: _AyahCard(
+                  row: page.rows[index],
+                  ayahLabel: s.ayahLabel,
+                  latinLabel: s.latinLabel,
+                  translationLabel: s.translationLabel,
+                ),
               );
             },
           ),
@@ -76,33 +76,34 @@ class _DetailBody extends StatelessWidget {
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-class _DetailHeader extends StatelessWidget {
-  const _DetailHeader({
-    required this.surahNumber,
-    required this.name,
-    required this.englishName,
-    required this.englishNameTranslation,
-    required this.revelationType,
-    required this.ayahCount,
-  });
+class _DetailHeader extends ConsumerWidget {
+  const _DetailHeader({required this.surahNumber, required this.page, required this.lang});
 
   final int surahNumber;
-  final String name;
-  final String englishName;
-  final String englishNameTranslation;
-  final String revelationType;
-  final int ayahCount;
+  final SurahPageResponse page;
+  final AppLanguage lang;
 
   @override
-  Widget build(BuildContext context) {
-    final isMakki = revelationType.toLowerCase() == 'meccan';
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = lang.strings;
+    final isMakki = page.revelationType.toLowerCase() == 'meccan';
+    final isId = lang == AppLanguage.indonesian;
+    final idx = surahNumber - 1;
+
+    final navName = isId && idx < surahNamesId.length
+        ? surahNamesId[idx]
+        : page.englishName;
+    final heroTranslation = isId && idx < surahTranslationsId.length
+        ? surahTranslationsId[idx]
+        : page.englishNameTranslation;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Nav bar ────────────────────────────────────────────────────
+        // ── Nav bar: ← nama  |  #N  toggle ──────────────────────────
         Row(
           children: [
+            // Tombol back
             IconButton(
               onPressed: () => Navigator.of(context).maybePop(),
               icon: const Icon(Icons.arrow_back_rounded),
@@ -115,16 +116,17 @@ class _DetailHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            Flexible(
+            // Nama surah — mengisi sisa ruang
+            Expanded(
               child: Text(
-                englishName,
+                navName,
                 style: Theme.of(context).textTheme.titleLarge,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
             const SizedBox(width: 8),
-            // Badge nomor — const decoration
+            // Nomor surah
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: const BoxDecoration(
@@ -133,37 +135,34 @@ class _DetailHeader extends StatelessWidget {
               ),
               child: Text(
                 '#$surahNumber',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontSize: 14),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 14),
               ),
             ),
+            const SizedBox(width: 8),
+            // Toggle EN/ID — di nav bar, tidak ada overlap
+            const _LangToggle(),
           ],
         ),
         const SizedBox(height: 12),
 
-        // ── Hero card ──────────────────────────────────────────────────
+        // ── Hero card ────────────────────────────────────────────────
         Container(
           width: double.infinity,
           decoration: const BoxDecoration(
             gradient: AppTheme.heroGradient,
             borderRadius: BorderRadius.all(Radius.circular(20)),
             boxShadow: [
-              BoxShadow(
-                color: AppTheme.green800op30,
-                blurRadius: 16,
-                offset: Offset(0, 6),
-              ),
+              BoxShadow(color: AppTheme.green800op30, blurRadius: 16, offset: Offset(0, 6)),
             ],
           ),
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              Text(name, textAlign: TextAlign.center, style: AppTheme.arabicHero),
-              const SizedBox(height: 4),
+              // Nama Arab — penuh, tidak ada widget lain di baris ini
+              Text(page.name, textAlign: TextAlign.center, style: AppTheme.arabicHero),
+              const SizedBox(height: 6),
               Text(
-                englishNameTranslation,
+                heroTranslation,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontFamily: 'Poppins',
@@ -176,7 +175,6 @@ class _DetailHeader extends StatelessWidget {
               const SizedBox(height: 14),
               const Divider(color: AppTheme.white15, height: 1),
               const SizedBox(height: 14),
-              // Wrap: pills tidak overflow di layar sempit
               Wrap(
                 alignment: WrapAlignment.center,
                 spacing: 8,
@@ -184,20 +182,17 @@ class _DetailHeader extends StatelessWidget {
                 children: [
                   _MetaPill(
                     icon: Icons.place_outlined,
-                    label: revelationType,
-                    // warna berbeda: Meccan = teal, Medinan = amber
-                    color: isMakki
-                        ? const Color(0xFFB2F5EA) // tealAccent.shade100
-                        : const Color(0xFFFEF3C7), // amber.shade100
+                    label: isMakki ? s.revelationMeccan : s.revelationMedian,
+                    color: isMakki ? const Color(0xFFB2F5EA) : const Color(0xFFFEF3C7),
                   ),
                   _MetaPill(
                     icon: Icons.format_list_numbered_rounded,
-                    label: '$ayahCount Ayahs',
+                    label: '${page.numberOfAyahs} ${s.ayahsCount}',
                     color: AppTheme.white85,
                   ),
-                  const _MetaPill(
+                  _MetaPill(
                     icon: Icons.translate_rounded,
-                    label: 'en.asad',
+                    label: lang.fullLabel,
                     color: AppTheme.white85,
                   ),
                 ],
@@ -207,7 +202,7 @@ class _DetailHeader extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        // ── Bismillah (kecuali Surah #9 At-Tawbah) ────────────────────
+        // Bismillah — kecuali At-Taubah #9
         if (surahNumber != 9)
           Container(
             width: double.infinity,
@@ -216,9 +211,7 @@ class _DetailHeader extends StatelessWidget {
             decoration: const BoxDecoration(
               color: AppTheme.green800op07,
               borderRadius: BorderRadius.all(Radius.circular(16)),
-              border: Border.fromBorderSide(
-                BorderSide(color: AppTheme.green800op12),
-              ),
+              border: Border.fromBorderSide(BorderSide(color: AppTheme.green800op12)),
             ),
             child: const Text(
               'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
@@ -231,15 +224,81 @@ class _DetailHeader extends StatelessWidget {
   }
 }
 
+// ── Language toggle ───────────────────────────────────────────────────────────
+
+class _LangToggle extends ConsumerWidget {
+  const _LangToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isEn = ref.watch(languageProvider) == AppLanguage.english;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.green800,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppTheme.green900op08),
+        boxShadow: const [
+          BoxShadow(color: AppTheme.green800op30, blurRadius: 6, offset: Offset(0, 2)),
+        ],
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _LangChip(
+            label: 'EN',
+            active: isEn,
+            onTap: () => ref.read(languageProvider.notifier).state = AppLanguage.english,
+          ),
+          _LangChip(
+            label: 'ID',
+            active: !isEn,
+            onTap: () => ref.read(languageProvider.notifier).state = AppLanguage.indonesian,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LangChip extends StatelessWidget {
+  const _LangChip({required this.label, required this.active, required this.onTap});
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+        decoration: BoxDecoration(
+          color: active ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: active ? AppTheme.green800 : Colors.white.withOpacity(0.6),
+            letterSpacing: 0.4,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Meta pill ─────────────────────────────────────────────────────────────────
 
 class _MetaPill extends StatelessWidget {
-  const _MetaPill({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
+  const _MetaPill({required this.icon, required this.label, required this.color});
   final IconData icon;
   final String label;
   final Color color;
@@ -265,10 +324,19 @@ class _MetaPill extends StatelessWidget {
 }
 
 // ── Ayah card ─────────────────────────────────────────────────────────────────
+
 class _AyahCard extends StatelessWidget {
-  const _AyahCard({required this.row});
+  const _AyahCard({
+    required this.row,
+    required this.ayahLabel,
+    required this.latinLabel,
+    required this.translationLabel,
+  });
 
   final AyahRow row;
+  final String ayahLabel;
+  final String latinLabel;
+  final String translationLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -282,10 +350,10 @@ class _AyahCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _AyahNumberRow(number: row.numberInSurah),
+          _AyahNumberRow(number: row.numberInSurah, ayahLabel: ayahLabel),
           _ArabicBlock(text: row.arabic),
-          if (row.latin.isNotEmpty) _LatinBlock(text: row.latin),
-          if (row.translation.isNotEmpty) _TranslationBlock(text: row.translation),
+          if (row.latin.isNotEmpty) _LatinBlock(text: row.latin, label: latinLabel),
+          if (row.translation.isNotEmpty) _TranslationBlock(text: row.translation, label: translationLabel),
           const SizedBox(height: 6),
         ],
       ),
@@ -293,11 +361,10 @@ class _AyahCard extends StatelessWidget {
   }
 }
 
-// ── Ayah number row ───────────────────────────────────────────────────────────
-
 class _AyahNumberRow extends StatelessWidget {
-  const _AyahNumberRow({required this.number});
+  const _AyahNumberRow({required this.number, required this.ayahLabel});
   final int number;
+  final String ayahLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +384,7 @@ class _AyahNumberRow extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            'Ayah $number',
+            '$ayahLabel $number',
             style: const TextStyle(
               fontFamily: 'Poppins',
               fontSize: 11,
@@ -332,23 +399,19 @@ class _AyahNumberRow extends StatelessWidget {
   }
 }
 
-// ── Arabic block ──────────────────────────────────────────────────────────────
-
 class _ArabicBlock extends StatelessWidget {
   const _ArabicBlock({required this.text});
   final String text;
 
-  static const _decoration = BoxDecoration(
+  static const _deco = BoxDecoration(
     color: AppTheme.green800op045,
-    border: Border.symmetric(
-      horizontal: BorderSide(color: AppTheme.green900op07),
-    ),
+    border: Border.symmetric(horizontal: BorderSide(color: AppTheme.green900op07)),
   );
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: _decoration,
+      decoration: _deco,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: Text(
@@ -363,29 +426,26 @@ class _ArabicBlock extends StatelessWidget {
   }
 }
 
-// ── Latin block ───────────────────────────────────────────────────────────────
-
 class _LatinBlock extends StatelessWidget {
-  const _LatinBlock({required this.text});
+  const _LatinBlock({required this.text, required this.label});
   final String text;
+  final String label;
 
-  static const _decoration = BoxDecoration(
+  static const _deco = BoxDecoration(
     color: Color(0xFFF0FAF4),
-    border: Border(
-      bottom: BorderSide(color: AppTheme.green900op06),
-    ),
+    border: Border(bottom: BorderSide(color: AppTheme.green900op06)),
   );
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: _decoration,
+      decoration: _deco,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _SectionLabel(label: 'Latin', color: AppTheme.green600op65),
+            _SectionLabel(label: label, color: AppTheme.green600op65),
             const SizedBox(height: 6),
             Text(text, softWrap: true, style: AppTheme.latinAyah),
           ],
@@ -395,11 +455,10 @@ class _LatinBlock extends StatelessWidget {
   }
 }
 
-// ── Translation block ─────────────────────────────────────────────────────────
-
 class _TranslationBlock extends StatelessWidget {
-  const _TranslationBlock({required this.text});
+  const _TranslationBlock({required this.text, required this.label});
   final String text;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -408,7 +467,7 @@ class _TranslationBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionLabel(label: 'Terjemahan', color: AppTheme.green600),
+          _SectionLabel(label: label, color: AppTheme.green600),
           const SizedBox(height: 6),
           Text(text, softWrap: true, style: AppTheme.translationAyah),
         ],
@@ -417,7 +476,6 @@ class _TranslationBlock extends StatelessWidget {
   }
 }
 
-// ── Section label ─────────────────────────────────────────────────────────────
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel({required this.label, required this.color});
   final String label;
@@ -428,7 +486,6 @@ class _SectionLabel extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Accent bar
         Container(
           width: 3,
           height: 13,
@@ -444,17 +501,11 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-// ── Error view ────────────────────────────────────────────────────────────────
-
 class _ErrorView extends StatelessWidget {
-  const _ErrorView({
-    required this.surahNumber,
-    required this.detail,
-    required this.onRetry,
-  });
-
-  final int surahNumber;
+  const _ErrorView({required this.label, required this.detail, required this.retryLabel, required this.onRetry});
+  final String label;
   final String detail;
+  final String retryLabel;
   final VoidCallback onRetry;
 
   @override
@@ -465,12 +516,11 @@ class _ErrorView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 24),
-          Text('Failed to load surah #$surahNumber',
-              style: Theme.of(context).textTheme.titleLarge),
+          Text(label, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(detail),
           const SizedBox(height: 12),
-          ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+          ElevatedButton(onPressed: onRetry, child: Text(retryLabel)),
         ],
       ),
     );

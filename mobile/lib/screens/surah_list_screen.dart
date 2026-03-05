@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../language.dart';
 import '../providers.dart';
 import '../theme.dart';
 import '../widgets/green_background.dart';
@@ -12,15 +13,17 @@ class SurahListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final surahAsync = ref.watch(surahListProvider);
+    final lang = ref.watch(languageProvider);
 
     return Scaffold(
       body: GreenBackground(
         child: surahAsync.when(
-          data: (surah) => _SurahListBody(surah: surah),
+          data: (surah) => _SurahListBody(surah: surah, lang: lang),
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => _ErrorView(
-            message: 'Failed to load surah list',
+            message: lang.strings.failedLoadList,
             detail: e.toString(),
+            retryLabel: lang.strings.retry,
             onRetry: () => ref.invalidate(surahListProvider),
           ),
         ),
@@ -29,22 +32,19 @@ class SurahListScreen extends ConsumerWidget {
   }
 }
 
-// ── Body terpisah agar hanya rebuild saat data berubah ───────────────────────
-
 class _SurahListBody extends StatelessWidget {
-  const _SurahListBody({required this.surah});
+  const _SurahListBody({required this.surah, required this.lang});
   final List surah;
+  final AppLanguage lang;
 
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
-      // physics default sudah ClampingScrollPhysics di Android,
-      // BouncingScrollPhysics di iOS — tidak perlu override
       slivers: [
-        const SliverToBoxAdapter(
+        SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-            child: _Header(),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+            child: _Header(lang: lang, total: surah.length),
           ),
         ),
         SliverPadding(
@@ -54,19 +54,27 @@ class _SurahListBody extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final s = surah[index];
-              // RepaintBoundary per card: scroll tidak memicu repaint seluruh list
+              final isId = lang == AppLanguage.indonesian;
+              final surahIndex = s.number - 1;
+              final displayName = isId && surahIndex < surahNamesId.length
+                  ? surahNamesId[surahIndex]
+                  : s.englishName;
+              final displayTranslation = isId && surahIndex < surahTranslationsId.length
+                  ? surahTranslationsId[surahIndex]
+                  : s.englishNameTranslation;
+
               return RepaintBoundary(
                 child: _SurahCard(
                   number: s.number,
-                  englishName: s.englishName,
-                  translation: s.englishNameTranslation,
+                  displayName: displayName,
+                  translation: displayTranslation,
                   revelationType: s.revelationType,
                   ayahCount: s.numberOfAyahs,
                   arabicName: s.name,
+                  lang: lang,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) =>
-                          SurahDetailScreen(surahNumber: s.number),
+                      builder: (_) => SurahDetailScreen(surahNumber: s.number),
                     ),
                   ),
                 ),
@@ -81,12 +89,15 @@ class _SurahListBody extends StatelessWidget {
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-/// Header adalah const widget — tidak pernah rebuild.
-class _Header extends StatelessWidget {
-  const _Header();
+class _Header extends ConsumerWidget {
+  const _Header({required this.lang, required this.total});
+  final AppLanguage lang;
+  final int total;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = lang.strings;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -96,32 +107,39 @@ class _Header extends StatelessWidget {
             gradient: AppTheme.heroGradient,
             borderRadius: BorderRadius.all(Radius.circular(20)),
             boxShadow: [
-              BoxShadow(
-                color: AppTheme.green800op35,
-                blurRadius: 20,
-                offset: Offset(0, 8),
-              ),
+              BoxShadow(color: AppTheme.green800op35, blurRadius: 20, offset: Offset(0, 8)),
             ],
           ),
-          padding: const EdgeInsets.all(20),
-          child: const Column(
+          padding: const EdgeInsets.fromLTRB(20, 16, 16, 20),
+          child: Column(
             children: [
-              Text(
-                'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Amiri',
-                  fontSize: 22,
-                  height: 2.0,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
-                ),
+              // ── Baris 1: toggle di kanan, teks Arab di kiri mengisi sisa ──
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontFamily: 'Amiri',
+                        fontSize: 22,
+                        height: 2.0,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Toggle — berdiri sendiri di kanan, tidak overlap teks Arab
+                  _LangToggle(current: lang),
+                ],
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
-                'In the name of Allah, the Most Gracious, the Most Merciful',
+                s.bismillahTranslation,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 11,
                   color: AppTheme.white75,
@@ -129,28 +147,28 @@ class _Header extends StatelessWidget {
                   height: 1.4,
                 ),
               ),
-              SizedBox(height: 16),
-              Divider(color: AppTheme.white15, height: 1),
-              SizedBox(height: 14),
+              const SizedBox(height: 16),
+              const Divider(color: AppTheme.white15, height: 1),
+              const SizedBox(height: 14),
               Wrap(
                 alignment: WrapAlignment.center,
                 spacing: 8,
                 runSpacing: 6,
                 children: [
-                  _Pill(icon: Icons.menu_book_rounded,  label: 'Al-Quran'),
-                  _Pill(icon: Icons.translate_rounded,   label: 'English Translation'),
-                  _Pill(icon: Icons.abc_rounded,         label: 'Latin Transliteration'),
+                  _Pill(icon: Icons.menu_book_rounded, label: '$total Surah'),
+                  _Pill(icon: Icons.translate_rounded, label: lang.fullLabel),
+                  const _Pill(icon: Icons.abc_rounded, label: 'Latin'),
                 ],
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            'All Surahs',
-            style: TextStyle(
+            s.allSurahs,
+            style: const TextStyle(
               fontFamily: 'Poppins',
               fontSize: 13,
               color: AppTheme.green900op50,
@@ -163,6 +181,80 @@ class _Header extends StatelessWidget {
     );
   }
 }
+
+// ── Language toggle ───────────────────────────────────────────────────────────
+
+class _LangToggle extends ConsumerWidget {
+  const _LangToggle({required this.current});
+  final AppLanguage current;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isEn = current == AppLanguage.english;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.green800,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppTheme.green900op08),
+        boxShadow: const [
+          BoxShadow(color: AppTheme.green800op30, blurRadius: 6, offset: Offset(0, 2)),
+        ],
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _LangChip(
+            label: 'EN',
+            active: isEn,
+            onTap: () => ref.read(languageProvider.notifier).state = AppLanguage.english,
+          ),
+          _LangChip(
+            label: 'ID',
+            active: !isEn,
+            onTap: () => ref.read(languageProvider.notifier).state = AppLanguage.indonesian,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LangChip extends StatelessWidget {
+  const _LangChip({required this.label, required this.active, required this.onTap});
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+        decoration: BoxDecoration(
+          color: active ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: active ? AppTheme.green800 : Colors.white.withOpacity(0.6),
+            letterSpacing: 0.4,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Info pill ─────────────────────────────────────────────────────────────────
 
 class _Pill extends StatelessWidget {
   const _Pill({required this.icon, required this.label});
@@ -182,10 +274,7 @@ class _Pill extends StatelessWidget {
         children: [
           Icon(icon, size: 13, color: AppTheme.white90),
           const SizedBox(width: 5),
-          Text(
-            label,
-            style: AppTheme.pillLabel.copyWith(color: AppTheme.white90),
-          ),
+          Text(label, style: AppTheme.pillLabel.copyWith(color: AppTheme.white90)),
         ],
       ),
     );
@@ -197,26 +286,30 @@ class _Pill extends StatelessWidget {
 class _SurahCard extends StatelessWidget {
   const _SurahCard({
     required this.number,
-    required this.englishName,
+    required this.displayName,
     required this.translation,
     required this.revelationType,
     required this.ayahCount,
     required this.arabicName,
+    required this.lang,
     required this.onTap,
   });
 
   final int number;
-  final String englishName;
+  final String displayName;
   final String translation;
   final String revelationType;
   final int ayahCount;
   final String arabicName;
+  final AppLanguage lang;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isMakki = revelationType.toLowerCase() == 'meccan';
     final tt = Theme.of(context).textTheme;
+    final s = lang.strings;
+    final revLabel = isMakki ? s.revelationMeccan : s.revelationMedian;
 
     return Card(
       child: InkWell(
@@ -245,13 +338,12 @@ class _SurahCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      englishName,
+                      displayName,
                       style: tt.titleMedium?.copyWith(fontSize: 15),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -271,9 +363,23 @@ class _SurahCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        _RevChip(isMakki: isMakki, label: revelationType),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: isMakki ? AppTheme.green800op10 : const Color(0x26F59E0B),
+                            borderRadius: const BorderRadius.all(Radius.circular(4)),
+                          ),
+                          child: Text(
+                            revLabel,
+                            style: AppTheme.sectionLabel.copyWith(
+                              fontSize: 10,
+                              letterSpacing: 0.3,
+                              color: isMakki ? AppTheme.green800 : const Color(0xFF92400E),
+                            ),
+                          ),
+                        ),
                         Text(
-                          '$ayahCount ayahs',
+                          '$ayahCount ${s.ayahsCount}',
                           style: tt.bodyMedium?.copyWith(
                             color: AppTheme.green900op45,
                             fontSize: 11,
@@ -285,7 +391,6 @@ class _SurahCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-
               SizedBox(
                 width: 70,
                 child: Text(
@@ -304,44 +409,17 @@ class _SurahCard extends StatelessWidget {
   }
 }
 
-class _RevChip extends StatelessWidget {
-  const _RevChip({required this.isMakki, required this.label});
-  final bool isMakki;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(
-        color: isMakki
-            ? AppTheme.green800op10
-            : const Color(0x26F59E0B), // amber @ 15%
-        borderRadius: const BorderRadius.all(Radius.circular(4)),
-      ),
-      child: Text(
-        label,
-        style: AppTheme.sectionLabel.copyWith(
-          fontSize: 10,
-          letterSpacing: 0.3,
-          color: isMakki ? AppTheme.green800 : const Color(0xFF92400E),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Error view ────────────────────────────────────────────────────────────────
-
 class _ErrorView extends StatelessWidget {
   const _ErrorView({
     required this.message,
     required this.detail,
+    required this.retryLabel,
     required this.onRetry,
   });
 
   final String message;
   final String detail;
+  final String retryLabel;
   final VoidCallback onRetry;
 
   @override
@@ -356,7 +434,7 @@ class _ErrorView extends StatelessWidget {
           const SizedBox(height: 8),
           Text(detail),
           const SizedBox(height: 12),
-          ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+          ElevatedButton(onPressed: onRetry, child: Text(retryLabel)),
         ],
       ),
     );
