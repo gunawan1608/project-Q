@@ -45,6 +45,36 @@ function staticCacheHeaders(res) {
   res.set('Cache-Control', 'public, max-age=3600, s-maxage=86400');
 }
 
+const BASMALA = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
+
+function normalizeArabicSurahPayload(surahId, arabicWrapper) {
+  const id = Number(surahId);
+  if (!Number.isFinite(id)) return arabicWrapper;
+  if (id === 1 || id === 9) return arabicWrapper;
+
+  const data = arabicWrapper?.data;
+  const ayahs = data?.ayahs;
+  if (!data || !Array.isArray(ayahs) || ayahs.length === 0) return arabicWrapper;
+
+  const first = ayahs[0];
+  const text = (first?.text ?? '').trim();
+  if (!text.startsWith(BASMALA)) return arabicWrapper;
+
+  const stripped = text.slice(BASMALA.length).trim();
+  if (!stripped) return arabicWrapper;
+
+  return {
+    ...arabicWrapper,
+    data: {
+      ...data,
+      ayahs: [
+        { ...first, text: stripped },
+        ...ayahs.slice(1),
+      ],
+    },
+  };
+}
+
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.get('/surah', async (_req, res) => {
@@ -75,12 +105,17 @@ app.get('/surah/:id', async (req, res) => {
 
   try {
     const [arabic, translation, transliteration] = await Promise.all([
-      fetchJson(`${QURAN_API_BASE}/surah/${encodeURIComponent(id)}`),
+      fetchJson(`${QURAN_API_BASE}/surah/${encodeURIComponent(id)}/quran-simple`),
       fetchJson(`${QURAN_API_BASE}/surah/${encodeURIComponent(id)}/${encodeURIComponent(edition)}`),
       fetchJson(`${QURAN_API_BASE}/surah/${encodeURIComponent(id)}/en.transliteration`),
     ]);
 
-    const payload = { arabic, translation, transliteration, edition };
+    const payload = {
+      arabic: normalizeArabicSurahPayload(id, arabic),
+      translation,
+      transliteration,
+      edition,
+    };
     cacheSet(key, payload);
     staticCacheHeaders(res);
     res.json(payload);

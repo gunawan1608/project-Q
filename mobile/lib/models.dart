@@ -42,11 +42,13 @@ class AyahRow {
 
 class _RawAyah {
   final int numberInSurah;
+  final int number;
   final String text;
-  const _RawAyah(this.numberInSurah, this.text);
+  const _RawAyah(this.numberInSurah, this.number, this.text);
 
   factory _RawAyah.fromJson(Map<String, dynamic> j) => _RawAyah(
         (j['numberInSurah'] as num?)?.toInt() ?? 0,
+        (j['number'] as num?)?.toInt() ?? 0,
         (j['text'] as String?) ?? '',
       );
 }
@@ -58,6 +60,26 @@ List<_RawAyah> _parseAyahs(Map<String, dynamic>? data) {
       .whereType<Map<String, dynamic>>()
       .map(_RawAyah.fromJson)
       .toList(growable: false);
+}
+
+Map<int, String> _ayahTextByNumberInSurah(List<_RawAyah> ayahs) {
+  final map = <int, String>{};
+  for (final a in ayahs) {
+    final n = a.numberInSurah;
+    if (n <= 0) continue;
+    map[n] = a.text;
+  }
+  return map;
+}
+
+Map<int, String> _ayahTextByNumber(List<_RawAyah> ayahs) {
+  final map = <int, String>{};
+  for (final a in ayahs) {
+    final n = a.number;
+    if (n <= 0) continue;
+    map[n] = a.text;
+  }
+  return map;
 }
 
 Map<String, dynamic> _dataOf(Map<String, dynamic>? wrapper) =>
@@ -94,18 +116,20 @@ class SurahPageResponse {
     final transAyahs   = _parseAyahs(transData);
     final tlitAyahs    = _parseAyahs(tlitData);
 
-    final count    = arabicAyahs.length;
-    final transLen = transAyahs.length;
-    final tlitLen  = tlitAyahs.length;
+    final transByNo = _ayahTextByNumber(transAyahs);
+    final tlitByNo  = _ayahTextByNumber(tlitAyahs);
 
-    final rows = List<AyahRow>.generate(count, (i) {
+    final rows = arabicAyahs.map((a) {
+      final key = a.number > 0 ? a.number : a.numberInSurah;
       return AyahRow(
-        numberInSurah: arabicAyahs[i].numberInSurah,
-        arabic:        arabicAyahs[i].text,
-        latin:         i < tlitLen  ? tlitAyahs[i].text  : '',
-        translation:   i < transLen ? transAyahs[i].text : '',
+        numberInSurah: a.numberInSurah,
+        arabic: a.text,
+        latin: tlitByNo[key] ?? '',
+        translation: transByNo[key] ?? '',
       );
-    }, growable: false);
+    }).toList(growable: false);
+
+    final count = rows.length;
 
     return SurahPageResponse(
       number:                  (arabicData['number'] as num?)?.toInt() ?? 0,
