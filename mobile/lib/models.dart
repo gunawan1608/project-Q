@@ -85,6 +85,25 @@ Map<int, String> _ayahTextByNumber(List<_RawAyah> ayahs) {
 Map<String, dynamic> _dataOf(Map<String, dynamic>? wrapper) =>
     (wrapper?['data'] as Map<String, dynamic>?) ?? const {};
 
+const String _basmala = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
+
+List<_RawAyah> _normalizeArabicAyahsForBasmala(int surahNumber, List<_RawAyah> ayahs) {
+  if (surahNumber == 1 || surahNumber == 9) return ayahs;
+  if (ayahs.isEmpty) return ayahs;
+
+  final first = ayahs.first;
+  final t = first.text.trim();
+  if (!t.startsWith(_basmala)) return ayahs;
+
+  final stripped = t.substring(_basmala.length).trim();
+  if (stripped.isEmpty) return ayahs;
+
+  return [
+    _RawAyah(first.numberInSurah, first.number, stripped),
+    ...ayahs.skip(1),
+  ];
+}
+
 class SurahPageResponse {
   final int number;
   final String name;
@@ -112,7 +131,9 @@ class SurahPageResponse {
     final transData    = _dataOf(json['translation']      as Map<String, dynamic>?);
     final tlitData     = _dataOf(json['transliteration']  as Map<String, dynamic>?);
 
-    final arabicAyahs  = _parseAyahs(arabicData);
+    final surahNumber = (arabicData['number'] as num?)?.toInt() ?? 0;
+
+    final arabicAyahs  = _normalizeArabicAyahsForBasmala(surahNumber, _parseAyahs(arabicData));
     final transAyahs   = _parseAyahs(transData);
     final tlitAyahs    = _parseAyahs(tlitData);
 
@@ -132,7 +153,7 @@ class SurahPageResponse {
     final count = rows.length;
 
     return SurahPageResponse(
-      number:                  (arabicData['number'] as num?)?.toInt() ?? 0,
+      number:                  surahNumber,
       name:                    (arabicData['name'] as String?) ?? '',
       englishName:             (arabicData['englishName'] as String?) ?? '',
       englishNameTranslation:  (arabicData['englishNameTranslation'] as String?) ?? '',

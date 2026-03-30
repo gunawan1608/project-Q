@@ -6,6 +6,20 @@ import 'package:http/http.dart' as http;
 import 'app_config.dart';
 import 'models.dart';
 
+const String _upstreamBase = 'https://api.alquran.cloud/v1';
+
+Map<String, dynamic> _wrapDetail({
+  required Map<String, dynamic> arabic,
+  required Map<String, dynamic> translation,
+  required Map<String, dynamic> transliteration,
+  required String edition,
+}) => {
+  'arabic': arabic,
+  'translation': translation,
+  'transliteration': transliteration,
+  'edition': edition,
+};
+
 List<SurahSummary> _parseSurahList(String body) {
   final jsonBody = json.decode(body) as Map<String, dynamic>;
   final data = (jsonBody['data'] as List?) ?? const [];
@@ -35,18 +49,41 @@ class ApiClient {
   }
 
   Future<List<SurahSummary>> getSurahList() async {
-    final res = await _client.get(_uri('/surah'));
-    _checkStatus(res);
-    return compute(_parseSurahList, res.body);
+    try {
+      final res = await _client.get(_uri('/surah'));
+      _checkStatus(res);
+      return compute(_parseSurahList, res.body);
+    } catch (_) {
+      final res = await _client.get(Uri.parse('$_upstreamBase/surah'));
+      _checkStatus(res);
+      return compute(_parseSurahList, res.body);
+    }
   }
 
   Future<SurahPageResponse> getSurahDetail(
     int id, {
     String edition = 'en.asad',
   }) async {
-    final res = await _client.get(_uri('/surah/$id', {'edition': edition}));
-    _checkStatus(res);
-    return compute(_parseSurahDetail, res.body);
+    try {
+      final res = await _client.get(_uri('/surah/$id', {'edition': edition}));
+      _checkStatus(res);
+      return compute(_parseSurahDetail, res.body);
+    } catch (_) {
+      final arabic = await _client.get(Uri.parse('$_upstreamBase/surah/$id/quran-simple'));
+      final translation = await _client.get(Uri.parse('$_upstreamBase/surah/$id/$edition'));
+      final transliteration = await _client.get(Uri.parse('$_upstreamBase/surah/$id/en.transliteration'));
+      _checkStatus(arabic);
+      _checkStatus(translation);
+      _checkStatus(transliteration);
+
+      final wrapped = _wrapDetail(
+        arabic: json.decode(arabic.body) as Map<String, dynamic>,
+        translation: json.decode(translation.body) as Map<String, dynamic>,
+        transliteration: json.decode(transliteration.body) as Map<String, dynamic>,
+        edition: edition,
+      );
+      return compute(_parseSurahDetail, json.encode(wrapped));
+    }
   }
 
   void _checkStatus(http.Response res) {
