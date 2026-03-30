@@ -29,8 +29,8 @@ class SurahSummary {
 class AyahRow {
   final int numberInSurah;
   final String arabic;
-  final String latin;       
-  final String translation; 
+  final String latin;
+  final String translation;
 
   const AyahRow({
     required this.numberInSurah,
@@ -62,16 +62,6 @@ List<_RawAyah> _parseAyahs(Map<String, dynamic>? data) {
       .toList(growable: false);
 }
 
-Map<int, String> _ayahTextByNumberInSurah(List<_RawAyah> ayahs) {
-  final map = <int, String>{};
-  for (final a in ayahs) {
-    final n = a.numberInSurah;
-    if (n <= 0) continue;
-    map[n] = a.text;
-  }
-  return map;
-}
-
 Map<int, String> _ayahTextByNumber(List<_RawAyah> ayahs) {
   final map = <int, String>{};
   for (final a in ayahs) {
@@ -87,7 +77,8 @@ Map<String, dynamic> _dataOf(Map<String, dynamic>? wrapper) =>
 
 const String _basmala = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
 
-List<_RawAyah> _normalizeArabicAyahsForBasmala(int surahNumber, List<_RawAyah> ayahs) {
+List<_RawAyah> _normalizeArabicAyahsForBasmala(
+    int surahNumber, List<_RawAyah> ayahs) {
   if (surahNumber == 1 || surahNumber == 9) return ayahs;
   if (ayahs.isEmpty) return ayahs;
 
@@ -127,18 +118,19 @@ class SurahPageResponse {
   });
 
   static SurahPageResponse fromJson(Map<String, dynamic> json) {
-    final arabicData   = _dataOf(json['arabic']          as Map<String, dynamic>?);
-    final transData    = _dataOf(json['translation']      as Map<String, dynamic>?);
-    final tlitData     = _dataOf(json['transliteration']  as Map<String, dynamic>?);
+    final arabicData = _dataOf(json['arabic'] as Map<String, dynamic>?);
+    final transData = _dataOf(json['translation'] as Map<String, dynamic>?);
+    final tlitData = _dataOf(json['transliteration'] as Map<String, dynamic>?);
 
     final surahNumber = (arabicData['number'] as num?)?.toInt() ?? 0;
 
-    final arabicAyahs  = _normalizeArabicAyahsForBasmala(surahNumber, _parseAyahs(arabicData));
-    final transAyahs   = _parseAyahs(transData);
-    final tlitAyahs    = _parseAyahs(tlitData);
+    final arabicAyahs =
+        _normalizeArabicAyahsForBasmala(surahNumber, _parseAyahs(arabicData));
+    final transAyahs = _parseAyahs(transData);
+    final tlitAyahs = _parseAyahs(tlitData);
 
     final transByNo = _ayahTextByNumber(transAyahs);
-    final tlitByNo  = _ayahTextByNumber(tlitAyahs);
+    final tlitByNo = _ayahTextByNumber(tlitAyahs);
 
     final rows = arabicAyahs.map((a) {
       final key = a.number > 0 ? a.number : a.numberInSurah;
@@ -153,14 +145,15 @@ class SurahPageResponse {
     final count = rows.length;
 
     return SurahPageResponse(
-      number:                  surahNumber,
-      name:                    (arabicData['name'] as String?) ?? '',
-      englishName:             (arabicData['englishName'] as String?) ?? '',
-      englishNameTranslation:  (arabicData['englishNameTranslation'] as String?) ?? '',
-      revelationType:          (arabicData['revelationType'] as String?) ?? '',
-      numberOfAyahs:           (arabicData['numberOfAyahs'] as num?)?.toInt() ?? count,
-      edition:                 (json['edition'] as String?) ?? 'en.asad',
-      rows:                    rows,
+      number: surahNumber,
+      name: (arabicData['name'] as String?) ?? '',
+      englishName: (arabicData['englishName'] as String?) ?? '',
+      englishNameTranslation:
+          (arabicData['englishNameTranslation'] as String?) ?? '',
+      revelationType: (arabicData['revelationType'] as String?) ?? '',
+      numberOfAyahs: (arabicData['numberOfAyahs'] as num?)?.toInt() ?? count,
+      edition: (json['edition'] as String?) ?? 'en.asad',
+      rows: rows,
     );
   }
 }

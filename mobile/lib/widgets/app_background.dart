@@ -1,4 +1,3 @@
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../theme.dart';
 
@@ -10,7 +9,7 @@ class AppBackground extends StatelessWidget {
 
   // shared painters — created once per app lifetime
   static final _LightPainter _light = _LightPainter();
-  static final _DarkPainter  _dark  = _DarkPainter();
+  static final _DarkPainter _dark = _DarkPainter();
 
   @override
   Widget build(BuildContext context) {

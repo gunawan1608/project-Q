@@ -11,7 +11,8 @@ final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.light);
 
 // ── Language ─────────────────────────────────────────────────────────────────
-final languageProvider = StateProvider<AppLanguage>((ref) => AppLanguage.english);
+final languageProvider =
+    StateProvider<AppLanguage>((ref) => AppLanguage.english);
 
 // ── Reader settings (per-surah popup) ────────────────────────────────────────
 class ReaderSettings {
@@ -39,6 +40,18 @@ class ReaderSettings {
 
 class ReaderSettingsNotifier extends StateNotifier<ReaderSettings> {
   ReaderSettingsNotifier() : super(const ReaderSettings());
+
+  void setLanguage(AppLanguage language) {
+    state = state.copyWith(language: language);
+  }
+
+  void setShowLatin(bool value) {
+    state = state.copyWith(showLatin: value);
+  }
+
+  void setShowTranslation(bool value) {
+    state = state.copyWith(showTranslation: value);
+  }
 }
 
 final readerSettingsProvider =
